@@ -2,25 +2,20 @@ package cz.eman.swagger.codegen.generator.kotlin
 
 import cz.eman.swagger.codegen.language.GENERATE_INFRASTRUCTURE_API
 import cz.eman.swagger.codegen.language.INFRASTRUCTURE_CLI
-import io.swagger.codegen.v3.CliOption
-import io.swagger.codegen.v3.CodegenConstants
-import io.swagger.codegen.v3.CodegenType
-import io.swagger.codegen.v3.SupportingFile
+import io.swagger.codegen.v3.*
 import io.swagger.codegen.v3.generators.kotlin.AbstractKotlinCodegen
-import org.slf4j.LoggerFactory
+import io.swagger.v3.oas.models.media.*
 import java.io.File
-import kotlin.collections.HashMap
 
 /**
  * @author eMan s.r.o. (vaclav.souhrada@eman.cz)
  */
-open class KotlinRetrofitCodegen() : AbstractKotlinCodegen() {
+open class KotlinRetrofitCodegen : AbstractKotlinCodegen() {
 
-    val DATE_LIBRARY = "dateLibrary"
-
-    val CLASS_API_SUFFIX = "Service"
-
-    var LOGGER = LoggerFactory.getLogger(KotlinRetrofitCodegen::class.java)
+    companion object {
+        const val DATE_LIBRARY = "dateLibrary"
+        const val CLASS_API_SUFFIX = "Service"
+    }
 
     protected var dateLib = DateLibrary.JAVA8.value
 
@@ -45,7 +40,6 @@ open class KotlinRetrofitCodegen() : AbstractKotlinCodegen() {
      * Constructs an instance of `KotlinClientCodegen`.
      */
     init {
-
         enumPropertyNaming = CodegenConstants.ENUM_PROPERTY_NAMING_TYPE.camelCase
 
         artifactId = "kotlin-retrofit-client"
@@ -90,7 +84,7 @@ open class KotlinRetrofitCodegen() : AbstractKotlinCodegen() {
     }
 
     override fun getHelp(): String {
-        return "Generates a kotlin room classes."
+        return "Generates a kotlin retrofit2 classes."
     }
 
     override fun getDefaultTemplateDir(): String {
@@ -110,10 +104,6 @@ open class KotlinRetrofitCodegen() : AbstractKotlinCodegen() {
         }
     }
 
-    fun setDateLibrary(library: String) {
-        this.dateLib = library
-    }
-
     override fun toApiName(name: String?): String {
         return super.toApiName(name) + CLASS_API_SUFFIX
     }
@@ -125,25 +115,28 @@ open class KotlinRetrofitCodegen() : AbstractKotlinCodegen() {
             setDateLibrary(additionalProperties[DATE_LIBRARY].toString())
         }
 
-        if (DateLibrary.THREETENBP.value == dateLib) {
-            additionalProperties[DateLibrary.THREETENBP.value] = true
-            typeMapping["date"] = "LocalDate"
-            typeMapping["DateTime"] = "LocalDateTime"
-            importMapping["LocalDate"] = "org.threeten.bp.LocalDate"
-            importMapping["LocalDateTime"] = "org.threeten.bp.LocalDateTime"
-            defaultIncludes.add("org.threeten.bp.LocalDateTime")
-        } else if (DateLibrary.STRING.value == dateLib) {
-            typeMapping["date-time"] = "kotlin.String"
-            typeMapping["date"] = "kotlin.String"
-            typeMapping["Date"] = "kotlin.String"
-            typeMapping["DateTime"] = "kotlin.String"
-        } else if (DateLibrary.JAVA8.value == dateLib) {
-            additionalProperties[DateLibrary.JAVA8.value] = true
-        } else if (DateLibrary.MILLIS.value == dateLib) {
-            typeMapping["date-time"] = "kotlin.Long"
-            typeMapping["date"] = "kotlin.String"
-            typeMapping["Date"] = "kotlin.String"
-            typeMapping["DateTime"] = "kotlin.Long"
+        when (dateLib) {
+            DateLibrary.THREETENBP.value -> {
+                additionalProperties[DateLibrary.THREETENBP.value] = true
+                typeMapping["date"] = "LocalDate"
+                typeMapping["DateTime"] = "LocalDateTime"
+                importMapping["LocalDate"] = "org.threeten.bp.LocalDate"
+                importMapping["LocalDateTime"] = "org.threeten.bp.LocalDateTime"
+                defaultIncludes.add("org.threeten.bp.LocalDateTime")
+            }
+            DateLibrary.STRING.value -> {
+                typeMapping["date-time"] = "kotlin.String"
+                typeMapping["date"] = "kotlin.String"
+                typeMapping["Date"] = "kotlin.String"
+                typeMapping["DateTime"] = "kotlin.String"
+            }
+            DateLibrary.JAVA8.value -> additionalProperties[DateLibrary.JAVA8.value] = true
+            DateLibrary.MILLIS.value -> {
+                typeMapping["date-time"] = "kotlin.Long"
+                typeMapping["date"] = "kotlin.String"
+                typeMapping["Date"] = "kotlin.String"
+                typeMapping["DateTime"] = "kotlin.Long"
+            }
         }
 
         supportingFiles.add(SupportingFile("README.mustache", "", "README.md"))
@@ -168,6 +161,29 @@ open class KotlinRetrofitCodegen() : AbstractKotlinCodegen() {
             supportingFiles.add(SupportingFile("infrastructure/Serializer.kt.mustache", infrastructureFolder, "Serializer.kt"))
             supportingFiles.add(SupportingFile("infrastructure/Errors.kt.mustache", infrastructureFolder, "Errors.kt"))
         }
+    }
+
+    override fun fromModel(name: String?, schema: Schema<*>?, allDefinitions: MutableMap<String, Schema<Any>>?): CodegenModel {
+        fixEmptyDataClass(schema)
+        return super.fromModel(name, schema, allDefinitions)
+    }
+
+    /**
+     * Kotlin data classes cannot be without value. This functions adds ignore value to the class
+     * to make sure it compiles. Make sure to check the schema definition.
+     *
+     * @param schema to be checked
+     */
+    private fun fixEmptyDataClass(schema: Schema<*>?) {
+        schema?.let {
+            if (it !is ArraySchema && it !is MapSchema && it !is ComposedSchema && (it.properties == null || it.properties.isEmpty())) {
+                it.properties = java.util.HashMap<String, Schema<String>>().apply { put("ignore", StringSchema().apply { description("No values defined for this class. Please check schema definition for this class.") }) }.toMap()
+            }
+        }
+    }
+
+    fun setDateLibrary(library: String) {
+        this.dateLib = library
     }
 
 }

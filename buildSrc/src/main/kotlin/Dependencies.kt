@@ -13,8 +13,8 @@ private object Versions {
     //val gradleBuildTools = "3.5.0-alpha07"
     val gradleBuildTools = "3.4.0"
 
-    val swaggerCodegen = "3.0.8"
-    val swaggerGenerators = "1.0.8"
+    val swaggerCodegen = "3.0.14"
+    val swaggerGenerators = "1.0.14"
 
     val mavenPublish = "3.6.2"
     val mavenGradleGithub = "1.5"
