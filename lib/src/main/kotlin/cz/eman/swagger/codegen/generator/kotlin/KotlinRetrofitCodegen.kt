@@ -5,6 +5,7 @@ import cz.eman.swagger.codegen.language.INFRASTRUCTURE_CLI
 import io.swagger.codegen.v3.*
 import io.swagger.codegen.v3.generators.kotlin.AbstractKotlinCodegen
 import io.swagger.v3.oas.models.media.*
+import io.swagger.v3.parser.util.SchemaTypeUtil
 import java.io.File
 
 /**
@@ -16,6 +17,8 @@ open class KotlinRetrofitCodegen : AbstractKotlinCodegen() {
         const val DATE_LIBRARY = "dateLibrary"
         const val CLASS_API_SUFFIX = "Service"
     }
+
+    private val numberDataTypes = arrayOf("kotlin.Short", "kotlin.Int", "kotlin.Long", "kotlin.Float", "kotlin.Double")
 
     protected var dateLib = DateLibrary.JAVA8.value
 
@@ -164,26 +167,86 @@ open class KotlinRetrofitCodegen : AbstractKotlinCodegen() {
     }
 
     override fun fromModel(name: String?, schema: Schema<*>?, allDefinitions: MutableMap<String, Schema<Any>>?): CodegenModel {
-        fixEmptyDataClass(schema)
+        fixSchemaType(schema)
+        fixEmptyType(schema)
         return super.fromModel(name, schema, allDefinitions)
-    }
-
-    /**
-     * Kotlin data classes cannot be without value. This functions adds ignore value to the class
-     * to make sure it compiles. Make sure to check the schema definition.
-     *
-     * @param schema to be checked
-     */
-    private fun fixEmptyDataClass(schema: Schema<*>?) {
-        schema?.let {
-            if (it !is ArraySchema && it !is MapSchema && it !is ComposedSchema && (it.properties == null || it.properties.isEmpty())) {
-                it.properties = java.util.HashMap<String, Schema<String>>().apply { put("ignore", StringSchema().apply { description("No values defined for this class. Please check schema definition for this class.") }) }.toMap()
-            }
-        }
     }
 
     fun setDateLibrary(library: String) {
         this.dateLib = library
+    }
+
+//    /**
+//     * Kotlin data classes cannot be without value. This functions adds ignore value to the class
+//     * to make sure it compiles. Make sure to check the schema definition.
+//     *
+//     * @param schema to be checked
+//     * @since 1.0.1
+//     */
+//    private fun fixEmptyType(schema: Schema<*>?) {
+//        schema?.let {
+//            if (it !is ArraySchema && it !is MapSchema && it !is ComposedSchema && (it.properties == null || it.properties.isEmpty())) {
+//                it.properties = java.util.HashMap<String, Schema<String>>().apply { put("ignore", StringSchema().apply { description("No values defined for this class. Please check schema definition for this class.") }) }.toMap()
+//            }
+//        }
+//    }
+
+    /**
+     * Fixes schemas that do not have set type. Not having a type would make them empty data classes
+     * that will not pass compilation.
+     *
+     * @param schema to be checked
+     * @since 1.0.1
+     */
+    private fun fixEmptyType(schema: Schema<*>?) {
+        schema?.let {
+            if (it !is ArraySchema && it !is MapSchema && it !is ComposedSchema && (it.type == null || it.type.isEmpty())) {
+                it.type = "string"
+            }
+        }
+    }
+
+    /**
+     * Fixes type for schema. There is an issue where type [SchemaTypeUtil.INTEGER_TYPE] with format
+     * [SchemaTypeUtil.INTEGER32_FORMAT] is wrongly represented as [SchemaTypeUtil.NUMBER_TYPE].
+     *
+     * @since 1.0.1
+     */
+    private fun fixSchemaType(schema: Schema<*>?) {
+        schema?.let {
+            if (it is IntegerSchema && it.type == SchemaTypeUtil.NUMBER_TYPE && it.format == SchemaTypeUtil.INTEGER32_FORMAT) {
+                it.type = SchemaTypeUtil.INTEGER_TYPE
+            }
+        }
+    }
+
+    /**
+     * Enum number values are not escaped to String.
+     *
+     * @since 1.0.1
+     */
+    override fun toEnumValue(value: String, datatype: String): String {
+        return if (datatype in numberDataTypes) {
+            value
+        } else {
+            "\"" + escapeText(value) + "\""
+        }
+    }
+
+    /**
+     * Enum number names are unified with Java code generation.
+     *
+     * @since 1.0.1
+     */
+    override fun toEnumVarName(value: String?, datatype: String?): String {
+        var name = super.toEnumVarName(value, datatype)
+        if (datatype in numberDataTypes) {
+            name = "NUMBER$name"
+            name = name.replace("-".toRegex(), "MINUS_")
+            name = name.replace("\\+".toRegex(), "PLUS_")
+            name = name.replace("\\.".toRegex(), "_DOT_")
+        }
+        return name
     }
 
 }
