@@ -9,14 +9,8 @@ buildscript {
     }
 
     dependencies {
-        // Kotlin Grade plugin
         classpath(GradlePlugins.kotlin)
-
-        // Build Tool to generate Kotlin KDoc documentation
         classpath(GradlePlugins.dokka)
-
-        //classpath(GradlePlugins.mavenPublish)
-
         classpath(GradlePlugins.bintrayGradle)
     }
 }
@@ -27,6 +21,7 @@ allprojects {
         google()
         jcenter()
     }
+
 }
 
 tasks.create<Delete>("clean") {
